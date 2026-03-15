@@ -316,6 +316,10 @@
         <label>Forced Jumps (lose piece if not taken)</label>
         <input type="checkbox" id="forced-jumps">
       </div>
+      <div class="color-setting">
+        <label>Sound Effects</label>
+        <input type="checkbox" id="sound-enabled" checked>
+      </div>
       <div class="color-setting" style="flex-direction: column; align-items: flex-start;">
         <label style="margin-bottom: 8px;">Red Piece Image (optional)</label>
         <input type="file" id="piece-image-red" accept="image/*" style="color: #ccc; font-size: 0.9rem;">
@@ -402,6 +406,80 @@
     let whiteRotation = 0;
     let customPieceTextureRed = null;
     let customPieceTextureWhite = null;
+    let soundEnabled = true;
+    let audioCtx = null;
+
+    function initAudio() {
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+    }
+
+    function playMoveSound() {
+      if (!soundEnabled) return;
+      initAudio();
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.frequency.setValueAtTime(220, audioCtx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(110, audioCtx.currentTime + 0.1);
+      gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.15);
+      osc.start();
+      osc.stop(audioCtx.currentTime + 0.15);
+    }
+
+    function playCaptureSound() {
+      if (!soundEnabled) return;
+      initAudio();
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.type = 'square';
+      osc.frequency.setValueAtTime(440, audioCtx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(110, audioCtx.currentTime + 0.15);
+      gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.2);
+      osc.start();
+      osc.stop(audioCtx.currentTime + 0.2);
+    }
+
+    function playKingSound() {
+      if (!soundEnabled) return;
+      initAudio();
+      const notes = [523, 659, 784, 1047];
+      notes.forEach((freq, i) => {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.frequency.setValueAtTime(freq, audioCtx.currentTime + i * 0.1);
+        gain.gain.setValueAtTime(0.2, audioCtx.currentTime + i * 0.1);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + i * 0.1 + 0.3);
+        osc.start(audioCtx.currentTime + i * 0.1);
+        osc.stop(audioCtx.currentTime + i * 0.1 + 0.3);
+      });
+    }
+
+    function playWinSound() {
+      if (!soundEnabled) return;
+      initAudio();
+      const notes = [392, 523, 659, 784, 1047];
+      notes.forEach((freq, i) => {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(freq, audioCtx.currentTime + i * 0.15);
+        gain.gain.setValueAtTime(0.3, audioCtx.currentTime + i * 0.15);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + i * 0.15 + 0.4);
+        osc.start(audioCtx.currentTime + i * 0.15);
+        osc.stop(audioCtx.currentTime + i * 0.15 + 0.4);
+      });
+    }
 
     function loadColors() {
       const saved = localStorage.getItem('draughtsColors');
@@ -434,6 +512,9 @@
       
       forcedJumps = localStorage.getItem('draughtsForcedJumps') === 'true';
       document.getElementById('forced-jumps').checked = forcedJumps;
+      
+      soundEnabled = localStorage.getItem('draughtsSoundEnabled') !== 'false';
+      document.getElementById('sound-enabled').checked = soundEnabled;
       
       redRotation = parseInt(localStorage.getItem('draughtsRedRotation') || '0');
       whiteRotation = parseInt(localStorage.getItem('draughtsWhiteRotation') || '0');
@@ -693,6 +774,14 @@
       document.getElementById('forced-jumps').addEventListener('change', function(e) {
         forcedJumps = e.target.checked;
         localStorage.setItem('draughtsForcedJumps', forcedJumps);
+      });
+
+      document.getElementById('sound-enabled').addEventListener('change', function(e) {
+        soundEnabled = e.target.checked;
+        localStorage.setItem('draughtsSoundEnabled', soundEnabled);
+        if (soundEnabled) {
+          initAudio();
+        }
       });
 
       function compressImage(file, team, quality = 0.7, maxWidth = 256, maxBytes = 500000) {
@@ -1547,6 +1636,7 @@
           createParticles(kingX, 0.5, kingZ, 0xffd700, 30);
           triggerBoardPulse();
           renderPieces();
+          playKingSound();
           
           currentPlayer = 'red';
           selectedPiece = null;
@@ -1583,8 +1673,10 @@
 
       animatePiece(fromRow, fromCol, toRow, toCol, () => {
         if (isCapture) {
+          playCaptureSound();
           animateCapture(chosenMove.captureRow, chosenMove.captureCol, doAfterAnimation);
         } else {
+          playMoveSound();
           doAfterAnimation();
         }
       });
@@ -1690,6 +1782,7 @@
           createParticles(kingX, 0.5, kingZ, 0xffd700, 30);
           triggerBoardPulse();
           renderPieces();
+          playKingSound();
           
           currentPlayer = currentPlayer === 'red' ? 'white' : 'red';
           selectedPiece = null;
@@ -1737,8 +1830,10 @@
 
       animatePiece(fromRow, fromCol, toRow, toCol, () => {
         if (isCapture) {
+          playCaptureSound();
           animateCapture(move.captureRow, move.captureCol, doAfterAnimation);
         } else {
+          playMoveSound();
           doAfterAnimation();
         }
       });
@@ -1775,6 +1870,7 @@
         createVictoryParticles(0xffffff);
         createVictoryParticles(0xffd700);
         triggerBoardPulse();
+        playWinSound();
         return true;
       }
       if (whiteCount === 0 || !hasAnyValidMoves('white')) {
@@ -1782,6 +1878,7 @@
         controls.enabled = false;
         aiThinkingIndicator.style.display = 'none';
         createVictoryParticles(0xe74c3c);
+        playWinSound();
         createVictoryParticles(0xffd700);
         triggerBoardPulse();
         return true;
