@@ -1,0 +1,2204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>3D Draughts</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: #1a1a2e;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      overflow: hidden;
+    }
+    h1 {
+      color: #eee;
+      margin-bottom: 10px;
+      font-size: 2.5rem;
+      text-transform: uppercase;
+      letter-spacing: 4px;
+      position: absolute;
+      top: 20px;
+      z-index: 10;
+    }
+    #status {
+      color: #aaa;
+      margin-bottom: 10px;
+      font-size: 1.2rem;
+      position: absolute;
+      top: 80px;
+      z-index: 10;
+    }
+    #status span {
+      font-weight: bold;
+    }
+    #ai-thinking {
+      color: #f39c12;
+      margin-bottom: 10px;
+      font-size: 1rem;
+      position: absolute;
+      top: 115px;
+      z-index: 10;
+      display: none;
+      animation: pulse 1s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+    .red { color: #e74c3c; }
+    .white { color: #ecf0f1; }
+    #canvas-container {
+      width: 100vw;
+      height: 100vh;
+    }
+    #game-buttons {
+      position: absolute;
+      bottom: 30px;
+      left: 0;
+      right: 0;
+      display: flex;
+      justify-content: space-evenly;
+      z-index: 10;
+    }
+    .btn {
+      padding: 12px 30px;
+      font-size: 1rem;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    #restart {
+      background: #3498db;
+    }
+    #restart:hover {
+      background: #2980b9;
+    }
+    #settings-btn {
+      background: #9b59b6;
+    }
+    #settings-btn:hover {
+      background: #8e44ad;
+    }
+    #back-btn {
+      background: #95a5a6;
+    }
+    #back-btn:hover {
+      background: #7f8c8d;
+    }
+    #rage-quit {
+      position: relative;
+      background: #e74c3c;
+      animation: fireGlow 0.5s infinite alternate;
+    }
+    #rage-quit::before, #rage-quit::after {
+      content: '';
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      top: 0;
+      left: 0;
+      pointer-events: none;
+      border-radius: 5px;
+    }
+    #rage-quit::before {
+      background: linear-gradient(to top, rgba(255,100,0,0.8), transparent);
+      animation: emberRise 1s infinite;
+    }
+    #rage-quit::after {
+      background: linear-gradient(to top, rgba(255,200,0,0.6), transparent);
+      animation: emberRise 1.5s infinite 0.5s;
+    }
+    @keyframes fireGlow {
+      from { box-shadow: 0 0 10px #ff6600, 0 0 20px #ff3300; }
+      to { box-shadow: 0 0 20px #ff9900, 0 0 40px #ff6600; }
+    }
+    @keyframes emberRise {
+      0% { opacity: 0.8; transform: translateY(0) scale(1); }
+      100% { opacity: 0; transform: translateY(-30px) scale(1.5); }
+    }
+    #rage-quit:hover {
+      background: #c0392b;
+    }
+    .btn-small {
+      padding: 6px 15px;
+      font-size: 0.85rem;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      background: #7f8c8d;
+    }
+    .btn-small:hover {
+      background: #95a5a6;
+    }
+
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.7);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+    }
+    .modal.open {
+      display: flex;
+    }
+    .modal-content {
+      background: #2c2c54;
+      padding: 30px;
+      border-radius: 10px;
+      min-width: 320px;
+      max-width: 90%;
+      text-align: center;
+    }
+    .modal-content h2 {
+      color: #eee;
+      margin-bottom: 20px;
+    }
+    .modal-content p {
+      color: #aaa;
+      margin-bottom: 20px;
+    }
+    .player-options {
+      display: flex;
+      gap: 15px;
+      justify-content: center;
+      margin-bottom: 20px;
+    }
+    .player-btn {
+      padding: 20px 40px;
+      font-size: 1.2rem;
+      background: #3498db;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: transform 0.2s, background 0.2s;
+    }
+    .player-btn:hover {
+      background: #2980b9;
+      transform: scale(1.05);
+    }
+    .player-btn.ai {
+      background: #e67e22;
+    }
+    .player-btn.ai:hover {
+      background: #d35400;
+    }
+
+    #settings-modal .color-setting {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 15px;
+    }
+    #settings-modal .color-setting label {
+      color: #ccc;
+      font-size: 1rem;
+    }
+    #settings-modal .color-setting input[type="color"] {
+      width: 50px;
+      height: 35px;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      background: transparent;
+    }
+    #settings-modal .color-setting input[type="checkbox"] {
+      width: 25px;
+      height: 25px;
+      cursor: pointer;
+    }
+    #settings-modal .close-btn {
+      display: block;
+      width: 100%;
+      margin-top: 20px;
+      padding: 12px;
+      background: #e74c3c;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 1rem;
+    }
+    #settings-modal .close-btn:hover {
+      background: #c0392b;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+  </style>
+</head>
+<body>
+  <h1>Draughts</h1>
+  <div id="status">Turn: <span class="red">Red</span></div>
+  <div id="ai-thinking">AI is thinking...</div>
+  <div id="canvas-container"></div>
+  <div id="game-buttons">
+    <button id="restart" class="btn hidden">New Game</button>
+    <button id="settings-btn" class="btn hidden">Settings</button>
+    <button id="back-btn" class="btn hidden">Back to Menu</button>
+    <button id="rage-quit" class="btn hidden">Rage Quit</button>
+  </div>
+
+  <div id="start-modal" class="modal open">
+    <div class="modal-content">
+      <h2>Welcome to Draughts</h2>
+      <p>Select number of players</p>
+      <div class="player-options">
+        <button id="btn-1player" class="player-btn ai">1 Player (vs AI)</button>
+        <button id="btn-2players" class="player-btn">2 Players</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="settings-modal" class="modal">
+    <div id="settings-content" class="modal-content">
+      <h2>Color Settings</h2>
+      <div class="color-setting">
+        <label>Red Pieces</label>
+        <input type="color" id="color-red" value="#c0392b">
+      </div>
+      <div class="color-setting">
+        <label>Red Piece Top</label>
+        <input type="color" id="color-red-top" value="#e74c3c">
+      </div>
+      <div class="color-setting">
+        <label>White Pieces</label>
+        <input type="color" id="color-white" value="#ecf0f1">
+      </div>
+      <div class="color-setting">
+        <label>White Piece Top</label>
+        <input type="color" id="color-white-top" value="#bdc3c7">
+      </div>
+      <div class="color-setting">
+        <label>Light Squares</label>
+        <input type="color" id="color-light" value="#d4a574">
+      </div>
+      <div class="color-setting">
+        <label>Dark Squares</label>
+        <input type="color" id="color-dark" value="#5d4037">
+      </div>
+      <div class="color-setting">
+        <label>Board Frame</label>
+        <input type="color" id="color-frame" value="#5d4037">
+      </div>
+      <div class="color-setting">
+        <label>Randomize Colors Each Turn</label>
+        <input type="checkbox" id="color-randomize">
+      </div>
+      <div class="color-setting">
+        <label>AI Difficulty</label>
+        <select id="ai-difficulty" style="padding: 8px; border-radius: 4px; border: none; background: #444; color: white; font-size: 0.9rem;">
+          <option value="easy">Easy</option>
+          <option value="medium" selected>Medium</option>
+          <option value="hard">Hard</option>
+        </select>
+      </div>
+      <div class="color-setting">
+        <label>Forced Jumps (lose piece if not taken)</label>
+        <input type="checkbox" id="forced-jumps">
+      </div>
+      <div class="color-setting" style="flex-direction: column; align-items: flex-start;">
+        <label style="margin-bottom: 8px;">Red Piece Image (optional)</label>
+        <input type="file" id="piece-image-red" accept="image/*" style="color: #ccc; font-size: 0.9rem;">
+        <div style="margin-top: 5px; display: flex; gap: 5px;">
+          <button id="rotate-image-red" class="btn-small">Rotate</button>
+          <button id="remove-image-red" class="btn-small">Remove</button>
+        </div>
+      </div>
+      <div class="color-setting" style="flex-direction: column; align-items: flex-start;">
+        <label style="margin-bottom: 8px;">White Piece Image (optional)</label>
+        <input type="file" id="piece-image-white" accept="image/*" style="color: #ccc; font-size: 0.9rem;">
+        <div style="margin-top: 5px; display: flex; gap: 5px;">
+          <button id="rotate-image-white" class="btn-small">Rotate</button>
+          <button id="remove-image-white" class="btn-small">Remove</button>
+        </div>
+      </div>
+      <button id="close-settings" class="close-btn">Close</button>
+    </div>
+  </div>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+    const container = document.getElementById('canvas-container');
+    const status = document.getElementById('status');
+    const aiThinkingIndicator = document.getElementById('ai-thinking');
+    const restartBtn = document.getElementById('restart');
+    const settingsBtn = document.getElementById('settings-btn');
+    const backBtn = document.getElementById('back-btn');
+    const rageQuitBtn = document.getElementById('rage-quit');
+    const startModal = document.getElementById('start-modal');
+    const settingsModal = document.getElementById('settings-modal');
+    const closeSettingsBtn = document.getElementById('close-settings');
+    const btn1Player = document.getElementById('btn-1player');
+    const btn2Players = document.getElementById('btn-2players');
+
+    let scene, camera, renderer, controls;
+    let boardGroup, piecesGroup, highlightsGroup;
+    let frameMesh, squareMeshes = [];
+    let raycaster, mouse;
+    let gameState = [];
+    let currentPlayer = 'red';
+    let selectedPiece = null;
+    let validMoves = [];
+    let pieceMeshes = {};
+    let isSinglePlayer = false;
+    let aiDifficulty = 'medium';
+    let forcedJumps = false;
+    let gameStarted = false;
+    let isAnimating = false;
+
+    const SQUARE_SIZE = 1;
+    const PIECE_RADIUS = 0.38;
+    const PIECE_HEIGHT = 0.15;
+
+    let particles = [];
+    let screenShake = { x: 0, y: 0, z: 0 };
+    let boardPulse = 0;
+    let victoryParticles = [];
+
+    const defaultColors = {
+      red: 0xc0392b,
+      redTop: 0xe74c3c,
+      white: 0xecf0f1,
+      whiteTop: 0xbdc3c7,
+      light: 0xd4a574,
+      dark: 0x5d4037,
+      frame: 0x5d4037
+    };
+
+    let colors = { ...defaultColors };
+    let randomizeColors = false;
+    let redRotation = 0;
+    let whiteRotation = 0;
+    let customPieceTextureRed = null;
+    let customPieceTextureWhite = null;
+
+    function loadColors() {
+      const saved = localStorage.getItem('draughtsColors');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        colors = {
+          red: parseInt(parsed.red) || defaultColors.red,
+          redTop: parseInt(parsed.redTop) || defaultColors.redTop,
+          white: parseInt(parsed.white) || defaultColors.white,
+          whiteTop: parseInt(parsed.whiteTop) || defaultColors.whiteTop,
+          light: parseInt(parsed.light) || defaultColors.light,
+          dark: parseInt(parsed.dark) || defaultColors.dark,
+          frame: parseInt(parsed.frame) || defaultColors.frame
+        };
+      }
+      
+      randomizeColors = localStorage.getItem('draughtsRandomize') === 'true';
+      
+      document.getElementById('color-red').value = '#' + colors.red.toString(16).padStart(6, '0');
+      document.getElementById('color-red-top').value = '#' + colors.redTop.toString(16).padStart(6, '0');
+      document.getElementById('color-white').value = '#' + colors.white.toString(16).padStart(6, '0');
+      document.getElementById('color-white-top').value = '#' + colors.whiteTop.toString(16).padStart(6, '0');
+      document.getElementById('color-light').value = '#' + colors.light.toString(16).padStart(6, '0');
+      document.getElementById('color-dark').value = '#' + colors.dark.toString(16).padStart(6, '0');
+      document.getElementById('color-frame').value = '#' + colors.frame.toString(16).padStart(6, '0');
+      document.getElementById('color-randomize').checked = randomizeColors;
+      
+      aiDifficulty = localStorage.getItem('draughtsAIDifficulty') || 'medium';
+      document.getElementById('ai-difficulty').value = aiDifficulty;
+      
+      forcedJumps = localStorage.getItem('draughtsForcedJumps') === 'true';
+      document.getElementById('forced-jumps').checked = forcedJumps;
+      
+      redRotation = parseInt(localStorage.getItem('draughtsRedRotation') || '0');
+      whiteRotation = parseInt(localStorage.getItem('draughtsWhiteRotation') || '0');
+      
+      const savedImageRed = localStorage.getItem('draughtsPieceImageRed');
+      if (savedImageRed) {
+        loadCustomTexture(savedImageRed, 'red');
+      }
+      
+      const savedImageWhite = localStorage.getItem('draughtsPieceImageWhite');
+      if (savedImageWhite) {
+        loadCustomTexture(savedImageWhite, 'white');
+      }
+    }
+
+    function loadCustomTexture(imageData, team, rotation = 0) {
+      const img = new Image();
+      img.onload = function() {
+        const texture = new THREE.Texture(img);
+        texture.wrapS = THREE.ClampToEdgeWrapping;
+        texture.wrapT = THREE.ClampToEdgeWrapping;
+        texture.colorSpace = THREE.SRGBColorSpace;
+        texture.rotation = rotation * (Math.PI / 180);
+        texture.center.set(0.5, 0.5);
+        texture.needsUpdate = true;
+        
+        if (team === 'red') {
+          if (customPieceTextureRed) customPieceTextureRed.dispose();
+          customPieceTextureRed = texture;
+        } else {
+          if (customPieceTextureWhite) customPieceTextureWhite.dispose();
+          customPieceTextureWhite = texture;
+        }
+        
+        renderPieces();
+      };
+      img.onerror = function() {
+        console.error('Failed to load image');
+      };
+      img.src = imageData;
+    }
+
+    function saveColors() {
+      colors = {
+        red: parseInt(document.getElementById('color-red').value.replace('#', ''), 16),
+        redTop: parseInt(document.getElementById('color-red-top').value.replace('#', ''), 16),
+        white: parseInt(document.getElementById('color-white').value.replace('#', ''), 16),
+        whiteTop: parseInt(document.getElementById('color-white-top').value.replace('#', ''), 16),
+        light: parseInt(document.getElementById('color-light').value.replace('#', ''), 16),
+        dark: parseInt(document.getElementById('color-dark').value.replace('#', ''), 16),
+        frame: parseInt(document.getElementById('color-frame').value.replace('#', ''), 16)
+      };
+      randomizeColors = document.getElementById('color-randomize').checked;
+      localStorage.setItem('draughtsColors', JSON.stringify(colors));
+      localStorage.setItem('draughtsRandomize', randomizeColors);
+      applyColors();
+    }
+
+    function applyColors() {
+      if (frameMesh) {
+        frameMesh.material.color.setHex(colors.frame);
+      }
+      squareMeshes.forEach(mesh => {
+        const isLight = mesh.userData.isLight;
+        mesh.material.color.setHex(isLight ? colors.light : colors.dark);
+      });
+      renderPieces();
+    }
+
+    function showGameUI() {
+      restartBtn.classList.remove('hidden');
+      settingsBtn.classList.remove('hidden');
+      backBtn.classList.remove('hidden');
+      rageQuitBtn.classList.remove('hidden');
+      startModal.classList.remove('open');
+      gameStarted = true;
+    }
+
+    function hideGameUI() {
+      restartBtn.classList.add('hidden');
+      settingsBtn.classList.add('hidden');
+      backBtn.classList.add('hidden');
+      rageQuitBtn.classList.add('hidden');
+      startModal.classList.add('open');
+      gameStarted = false;
+      aiThinkingIndicator.style.display = 'none';
+    }
+
+    function rageQuit() {
+      gameStarted = false;
+      controls.enabled = false;
+      aiThinkingIndicator.style.display = 'none';
+      rageQuitBtn.classList.add('hidden');
+
+      for (let i = 0; i < 20; i++) {
+        setTimeout(() => {
+          triggerScreenShake(0.3 + Math.random() * 0.2);
+        }, i * 30);
+      }
+
+      for (let row = 0; row < 8; row++) {
+        for (let col = 0; col < 8; col++) {
+          if (gameState[row][col]) {
+            const piece = gameState[row][col];
+            const mesh = pieceMeshes[`${row}-${col}`];
+            if (mesh) {
+              const angle = Math.random() * Math.PI * 2;
+              const force = 0.2 + Math.random() * 0.3;
+              mesh.userData.velocity = {
+                x: Math.cos(angle) * force,
+                y: 0.3 + Math.random() * 0.4,
+                z: Math.sin(angle) * force,
+                rotX: (Math.random() - 0.5) * 0.3,
+                rotY: (Math.random() - 0.5) * 0.3,
+                rotZ: (Math.random() - 0.5) * 0.3
+              };
+              pieceMeshes[`${row}-${col}`] = mesh;
+            }
+          }
+        }
+      }
+
+      status.innerHTML = '<span class="white">White (AI)</span> wins!';
+      createVictoryParticles(0xffffff);
+      createVictoryParticles(0xffd700);
+      triggerBoardPulse();
+    }
+
+    function updateFlingPieces() {
+      for (let row = 0; row < 8; row++) {
+        for (let col = 0; col < 8; col++) {
+          const mesh = pieceMeshes[`${row}-${col}`];
+          if (mesh && mesh.userData.velocity) {
+            const v = mesh.userData.velocity;
+            mesh.position.x += v.x;
+            mesh.position.y += v.y;
+            mesh.position.z += v.z;
+            mesh.rotation.x += v.rotX;
+            mesh.rotation.y += v.rotY;
+            mesh.rotation.z += v.rotZ;
+            v.y -= 0.015;
+            
+            if (mesh.position.y < -3) {
+              v.y = 0;
+              v.x = 0;
+              v.z = 0;
+            }
+          }
+        }
+      }
+    }
+
+    function init() {
+      loadColors();
+
+      scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x1a1a2e);
+
+      camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 100);
+      camera.position.set(0, 10, 8);
+      camera.lookAt(0, 0, 0);
+
+      renderer = new THREE.WebGLRenderer({ antialias: true });
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setPixelRatio(window.devicePixelRatio);
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      container.appendChild(renderer.domElement);
+
+      controls = new OrbitControls(camera, renderer.domElement);
+      controls.enableDamping = true;
+      controls.dampingFactor = 0.05;
+      controls.rotateSpeed = 0.5;
+      controls.enablePan = false;
+      controls.minDistance = 5;
+      controls.maxDistance = 20;
+      controls.mouseButtons = {
+        LEFT: null,
+        MIDDLE: THREE.MOUSE.ROTATE,
+        RIGHT: THREE.MOUSE.ROTATE
+      };
+
+      const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
+      scene.add(ambientLight);
+
+      const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+      dirLight.position.set(5, 10, 5);
+      dirLight.castShadow = true;
+      dirLight.shadow.mapSize.width = 2048;
+      dirLight.shadow.mapSize.height = 2048;
+      dirLight.shadow.camera.near = 0.5;
+      dirLight.shadow.camera.far = 50;
+      dirLight.shadow.camera.left = -10;
+      dirLight.shadow.camera.right = 10;
+      dirLight.shadow.camera.top = 10;
+      dirLight.shadow.camera.bottom = -10;
+      scene.add(dirLight);
+
+      const spotLight = new THREE.SpotLight(0xffffff, 0.3);
+      spotLight.position.set(-5, 10, -5);
+      scene.add(spotLight);
+
+      raycaster = new THREE.Raycaster();
+      mouse = new THREE.Vector2();
+
+      boardGroup = new THREE.Group();
+      piecesGroup = new THREE.Group();
+      highlightsGroup = new THREE.Group();
+      scene.add(boardGroup);
+      scene.add(piecesGroup);
+      scene.add(highlightsGroup);
+
+      createBoard();
+      initGame();
+
+      renderer.domElement.addEventListener('click', onMouseClick);
+      window.addEventListener('resize', onWindowResize);
+      restartBtn.addEventListener('click', initGame);
+      
+      settingsBtn.addEventListener('click', () => settingsModal.classList.add('open'));
+      closeSettingsBtn.addEventListener('click', () => settingsModal.classList.remove('open'));
+      settingsModal.addEventListener('click', (e) => {
+        if (e.target === settingsModal) settingsModal.classList.remove('open');
+      });
+
+      backBtn.addEventListener('click', () => {
+        hideGameUI();
+      });
+
+      rageQuitBtn.addEventListener('click', () => {
+        rageQuit();
+      });
+
+      btn1Player.addEventListener('click', () => {
+        isSinglePlayer = true;
+        showGameUI();
+        initGame();
+      });
+
+      btn2Players.addEventListener('click', () => {
+        isSinglePlayer = false;
+        showGameUI();
+        initGame();
+      });
+
+      document.querySelectorAll('input[type="color"]').forEach(input => {
+        input.addEventListener('input', saveColors);
+      });
+
+      document.getElementById('color-randomize').addEventListener('change', saveColors);
+
+      document.getElementById('ai-difficulty').addEventListener('change', function(e) {
+        aiDifficulty = e.target.value;
+        localStorage.setItem('draughtsAIDifficulty', aiDifficulty);
+      });
+
+      document.getElementById('forced-jumps').addEventListener('change', function(e) {
+        forcedJumps = e.target.checked;
+        localStorage.setItem('draughtsForcedJumps', forcedJumps);
+      });
+
+      function compressImage(file, team, quality = 0.7, maxWidth = 256, maxBytes = 500000) {
+        const reader = new FileReader();
+        reader.onload = function(event) {
+          const img = new Image();
+          img.onload = function() {
+            let width = img.width;
+            let height = img.height;
+            let q = quality;
+            let compressedData = '';
+            let success = false;
+
+            while (!success && q > 0.1 && maxWidth >= 32) {
+              const canvas = document.createElement('canvas');
+              if (width > maxWidth || height > maxWidth) {
+                if (width > height) {
+                  height = Math.round(height * maxWidth / width);
+                  width = maxWidth;
+                } else {
+                  width = Math.round(width * maxWidth / height);
+                  height = maxWidth;
+                }
+              }
+
+              canvas.width = width;
+              canvas.height = height;
+              const ctx = canvas.getContext('2d');
+              ctx.drawImage(img, 0, 0, width, height);
+
+              compressedData = canvas.toDataURL('image/jpeg', q);
+              
+              try {
+                localStorage.setItem('draughtsPieceImage' + team.charAt(0).toUpperCase() + team.slice(1), compressedData);
+                success = true;
+              } catch (e) {
+                q -= 0.1;
+                if (q < 0.1) {
+                  maxWidth = Math.max(32, maxWidth / 2);
+                  q = 0.7;
+                }
+              }
+            }
+
+            if (success) {
+              const rotation = team === 'red' ? redRotation : whiteRotation;
+              loadCustomTexture(compressedData, team, rotation);
+            } else {
+              alert('Could not save image. Try a smaller image.');
+            }
+          };
+          img.src = event.target.result;
+        };
+        reader.readAsDataURL(file);
+      }
+
+      document.getElementById('piece-image-red').addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (file) {
+          compressImage(file, 'red');
+        }
+      });
+
+      document.getElementById('piece-image-white').addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (file) {
+          compressImage(file, 'white');
+        }
+      });
+
+      document.getElementById('remove-image-red').addEventListener('click', function() {
+        localStorage.removeItem('draughtsPieceImageRed');
+        localStorage.removeItem('draughtsRedRotation');
+        redRotation = 0;
+        if (customPieceTextureRed) {
+          customPieceTextureRed.dispose();
+          customPieceTextureRed = null;
+        }
+        document.getElementById('piece-image-red').value = '';
+        renderPieces();
+      });
+
+      document.getElementById('remove-image-white').addEventListener('click', function() {
+        localStorage.removeItem('draughtsPieceImageWhite');
+        localStorage.removeItem('draughtsWhiteRotation');
+        whiteRotation = 0;
+        if (customPieceTextureWhite) {
+          customPieceTextureWhite.dispose();
+          customPieceTextureWhite = null;
+        }
+        document.getElementById('piece-image-white').value = '';
+        renderPieces();
+      });
+
+      document.getElementById('rotate-image-red').addEventListener('click', function() {
+        redRotation = (redRotation + 90) % 360;
+        localStorage.setItem('draughtsRedRotation', redRotation);
+        const savedImageRed = localStorage.getItem('draughtsPieceImageRed');
+        if (savedImageRed) {
+          loadCustomTexture(savedImageRed, 'red', redRotation);
+        }
+      });
+
+      document.getElementById('rotate-image-white').addEventListener('click', function() {
+        whiteRotation = (whiteRotation + 90) % 360;
+        localStorage.setItem('draughtsWhiteRotation', whiteRotation);
+        const savedImageWhite = localStorage.getItem('draughtsPieceImageWhite');
+        if (savedImageWhite) {
+          loadCustomTexture(savedImageWhite, 'white', whiteRotation);
+        }
+      });
+
+      animate();
+    }
+
+    function createBoard() {
+      const frameGeometry = new THREE.BoxGeometry(8.5, 0.3, 8.5);
+      const frameMaterial = new THREE.MeshStandardMaterial({ 
+        color: colors.frame,
+        roughness: 0.8,
+        metalness: 0.1
+      });
+      frameMesh = new THREE.Mesh(frameGeometry, frameMaterial);
+      frameMesh.position.y = -0.2;
+      frameMesh.receiveShadow = true;
+      boardGroup.add(frameMesh);
+
+      squareMeshes = [];
+      for (let row = 0; row < 8; row++) {
+        for (let col = 0; col < 8; col++) {
+          const isLight = (row + col) % 2 === 0;
+          const geometry = new THREE.BoxGeometry(SQUARE_SIZE - 0.05, 0.1, SQUARE_SIZE - 0.05);
+          const material = new THREE.MeshStandardMaterial({
+            color: isLight ? colors.light : colors.dark,
+            roughness: 0.7,
+            metalness: 0.1
+          });
+          const square = new THREE.Mesh(geometry, material);
+          square.position.set(
+            (col - 3.5) * SQUARE_SIZE,
+            0,
+            (row - 3.5) * SQUARE_SIZE
+          );
+          square.receiveShadow = true;
+          square.userData = { row, col, type: 'square', isLight };
+          boardGroup.add(square);
+          squareMeshes.push(square);
+        }
+      }
+    }
+
+    function createPiece(player, king = false) {
+      const group = new THREE.Group();
+
+      const geometry = new THREE.CylinderGeometry(PIECE_RADIUS, PIECE_RADIUS, PIECE_HEIGHT, 32);
+      const material = new THREE.MeshStandardMaterial({
+        color: player === 'red' ? colors.red : colors.white,
+        roughness: 0.3,
+        metalness: 0.2
+      });
+      const piece = new THREE.Mesh(geometry, material);
+      piece.castShadow = true;
+      piece.receiveShadow = true;
+      group.add(piece);
+
+      const topGeometry = new THREE.CylinderGeometry(PIECE_RADIUS * 0.85, PIECE_RADIUS * 0.9, 0.02, 32);
+      let topMaterial;
+      const teamTexture = player === 'red' ? customPieceTextureRed : customPieceTextureWhite;
+      
+      if (teamTexture) {
+        topMaterial = new THREE.MeshStandardMaterial({
+          map: teamTexture,
+          roughness: 0.2,
+          metalness: 0.1
+        });
+      } else {
+        topMaterial = new THREE.MeshStandardMaterial({
+          color: player === 'red' ? colors.redTop : colors.whiteTop,
+          roughness: 0.4,
+          metalness: 0.1
+        });
+      }
+      const top = new THREE.Mesh(topGeometry, topMaterial);
+      top.position.y = PIECE_HEIGHT / 2;
+      top.castShadow = true;
+      group.add(top);
+
+      if (king) {
+        const crownGeometry = new THREE.TorusGeometry(0.2, 0.04, 8, 16);
+        const crownMaterial = new THREE.MeshStandardMaterial({
+          color: 0xffd700,
+          roughness: 0.3,
+          metalness: 0.6
+        });
+        const crown = new THREE.Mesh(crownGeometry, crownMaterial);
+        crown.rotation.x = Math.PI / 2;
+        crown.position.y = PIECE_HEIGHT / 2 + 0.05;
+        crown.castShadow = true;
+        group.add(crown);
+      }
+
+      return group;
+    }
+
+    function initGame() {
+      gameState = [];
+      for (let row = 0; row < 8; row++) {
+        gameState[row] = [];
+        for (let col = 0; col < 8; col++) {
+          if ((row + col) % 2 === 1) {
+            if (row < 3) gameState[row][col] = { player: 'white', king: false };
+            else if (row > 4) gameState[row][col] = { player: 'red', king: false };
+            else gameState[row][col] = null;
+          } else {
+            gameState[row][col] = null;
+          }
+        }
+      }
+      currentPlayer = 'red';
+      selectedPiece = null;
+      validMoves = [];
+      aiThinkingIndicator.style.display = 'none';
+      rageQuitBtn.classList.remove('hidden');
+
+      renderPieces();
+      updateStatus();
+
+      if (!checkWin()) {
+        if (isSinglePlayer && currentPlayer === 'white') {
+          setTimeout(makeAIMove, 500);
+        }
+      }
+    }
+
+    function renderPieces() {
+      piecesGroup.clear();
+      pieceMeshes = {};
+
+      for (let row = 0; row < 8; row++) {
+        for (let col = 0; col < 8; col++) {
+          const piece = gameState[row][col];
+          if (piece) {
+            const pieceMesh = createPiece(piece.player, piece.king);
+            pieceMesh.position.set(
+              (col - 3.5) * SQUARE_SIZE,
+              PIECE_HEIGHT / 2,
+              (row - 3.5) * SQUARE_SIZE
+            );
+            pieceMesh.userData = { row, col, player: piece.player, king: piece.king, type: 'piece' };
+            
+            if (selectedPiece && selectedPiece.row === row && selectedPiece.col === col) {
+              pieceMesh.children.forEach(child => {
+                if (child.material) {
+                  child.material.emissive = new THREE.Color(0xf1c40f);
+                  child.material.emissiveIntensity = 0.5;
+                }
+              });
+              pieceMesh.scale.setScalar(1.1);
+            }
+
+            piecesGroup.add(pieceMesh);
+            pieceMeshes[`${row}-${col}`] = pieceMesh;
+          }
+        }
+      }
+    }
+
+    function showValidMoves() {
+      highlightsGroup.clear();
+
+      for (const move of validMoves) {
+        const isCapture = move.capture;
+        const baseGeometry = new THREE.CircleGeometry(isCapture ? 0.35 : 0.25, 32);
+        const baseMaterial = new THREE.MeshBasicMaterial({
+          color: isCapture ? 0xe74c3c : 0x2ecc71,
+          transparent: true,
+          opacity: isCapture ? 0.5 : 0.4,
+          side: THREE.DoubleSide
+        });
+        const highlight = new THREE.Mesh(baseGeometry, baseMaterial);
+        highlight.rotation.x = -Math.PI / 2;
+        highlight.position.set(
+          (move.col - 3.5) * SQUARE_SIZE,
+          0.06,
+          (move.row - 3.5) * SQUARE_SIZE
+        );
+        
+        if (isCapture) {
+          const ringGeometry = new THREE.RingGeometry(0.25, 0.32, 32);
+          const ringMaterial = new THREE.MeshBasicMaterial({
+            color: 0xff0000,
+            transparent: true,
+            opacity: 0.8,
+            side: THREE.DoubleSide
+          });
+          const ring = new THREE.Mesh(ringGeometry, ringMaterial);
+          ring.rotation.x = -Math.PI / 2;
+          ring.position.set(
+            (move.col - 3.5) * SQUARE_SIZE,
+            0.07,
+            (move.row - 3.5) * SQUARE_SIZE
+          );
+          highlightsGroup.add(ring);
+        }
+        
+        highlight.userData = { row: move.row, col: move.col, isCapture };
+        highlightsGroup.add(highlight);
+      }
+    }
+
+    function hasAnyCaptureMoves(player) {
+      for (let row = 0; row < 8; row++) {
+        for (let col = 0; col < 8; col++) {
+          const piece = gameState[row][col];
+          if (piece && piece.player === player) {
+            const moves = getValidMoves(row, col, piece);
+            if (moves.some(m => m.capture)) return true;
+          }
+        }
+      }
+      return false;
+    }
+
+    function selectPiece(row, col) {
+      if (isSinglePlayer && currentPlayer === 'white') return;
+      
+      const piece = gameState[row][col];
+      if (!piece || piece.player !== currentPlayer) return;
+
+      selectedPiece = { row, col };
+      validMoves = getValidMoves(row, col, piece);
+      renderPieces();
+      showValidMoves();
+    }
+
+    function getAllMovesForPlayer(player) {
+      const allMoves = [];
+      for (let row = 0; row < 8; row++) {
+        for (let col = 0; col < 8; col++) {
+          const piece = gameState[row][col];
+          if (piece && piece.player === player) {
+            const moves = getValidMoves(row, col, piece);
+            for (const move of moves) {
+              allMoves.push({
+                from: { row, col },
+                to: { row: move.row, col: move.col },
+                capture: move.capture,
+                captureRow: move.captureRow,
+                captureCol: move.captureCol
+              });
+            }
+          }
+        }
+      }
+      return allMoves;
+    }
+
+    function isSquareUnderAttack(row, col, byPlayer) {
+      const directions = byPlayer === 'red' 
+        ? [[-1, -1], [-1, 1]]
+        : [[1, -1], [1, 1]];
+      
+      for (const [dr, dc] of directions) {
+        const attackRow = row + dr;
+        const attackCol = col + dc;
+        
+        if (isValidPos(attackRow, attackCol)) {
+          const piece = gameState[attackRow][attackCol];
+          if (piece && piece.player === byPlayer) {
+            const jumpRow = row + dr * 2;
+            const jumpCol = col + dc * 2;
+            if (isValidPos(jumpRow, jumpCol) && !gameState[jumpRow][jumpCol]) {
+              return true;
+            }
+          }
+        }
+      }
+      return false;
+    }
+
+    function isKingUnderAttack(row, col, byPlayer) {
+      const directions = [[-1, -1], [-1, 1], [1, -1], [1, 1]];
+      
+      for (const [dr, dc] of directions) {
+        const attackRow = row + dr;
+        const attackCol = col + dc;
+        
+        if (isValidPos(attackRow, attackCol)) {
+          const piece = gameState[attackRow][attackCol];
+          if (piece && piece.player === byPlayer) {
+            const jumpRow = row + dr * 2;
+            const jumpCol = col + dc * 2;
+            if (isValidPos(jumpRow, jumpCol) && !gameState[jumpRow][jumpCol]) {
+              return true;
+            }
+          }
+        }
+      }
+      return false;
+    }
+
+    function cloneGameState(state) {
+      const newState = [];
+      for (let row = 0; row < 8; row++) {
+        newState[row] = [];
+        for (let col = 0; col < 8; col++) {
+          if (state[row][col]) {
+            newState[row][col] = { ...state[row][col] };
+          } else {
+            newState[row][col] = null;
+          }
+        }
+      }
+      return newState;
+    }
+
+    function evaluatePosition(state, player) {
+      let score = 0;
+      const opponent = player === 'white' ? 'red' : 'white';
+      
+      const pieceValues = {
+        0: 5, 1: 6, 2: 7, 3: 8, 4: 9, 5: 8, 6: 7, 7: 6,
+        king: 20
+      };
+      
+      const centerControl = [
+        [0, 0, 0, 0.5, 0.5, 0, 0, 0],
+        [0, 0, 1, 1.5, 1.5, 1, 0, 0],
+        [0, 1, 2, 3, 3, 2, 1, 0],
+        [0.5, 1.5, 3, 4, 4, 3, 1.5, 0.5],
+        [0.5, 1.5, 3, 4, 4, 3, 1.5, 0.5],
+        [0, 1, 2, 3, 3, 2, 1, 0],
+        [0, 0, 1, 1.5, 1.5, 1, 0, 0],
+        [0, 0, 0, 0.5, 0.5, 0, 0, 0]
+      ];
+      
+      let playerPieces = 0;
+      let opponentPieces = 0;
+      let playerKings = 0;
+      let opponentKings = 0;
+      let playerPromotable = 0;
+      
+      for (let row = 0; row < 8; row++) {
+        for (let col = 0; col < 8; col++) {
+          const piece = state[row][col];
+          if (piece) {
+            const baseValue = piece.king ? pieceValues.king : pieceValues[row];
+            
+            if (piece.player === player) {
+              playerPieces++;
+              score += baseValue * 10;
+              score += centerControl[row][col] * 2;
+              
+              if (piece.king) {
+                playerKings++;
+              } else {
+                if (player === 'white' && row <= 2) playerPromotable++;
+                if (player === 'red' && row >= 5) playerPromotable++;
+                
+                if (player === 'white' && row === 1) {
+                  score += 15;
+                }
+                if (player === 'red' && row === 6) {
+                  score += 15;
+                }
+              }
+              
+              const rowDiff = player === 'white' ? row : 7 - row;
+              score += rowDiff * 1.5;
+              
+              if (!piece.king) {
+                const isProtected = isPieceProtected(state, row, col, player);
+                if (isProtected) score += 3;
+              }
+              
+              const isBackRow = (player === 'white' && row === 7) || (player === 'red' && row === 0);
+              if (isBackRow) score += 2;
+              
+            } else {
+              opponentPieces++;
+              score -= baseValue * 10;
+              score -= centerControl[row][col] * 2;
+              
+              if (piece.king) {
+                opponentKings++;
+              }
+              
+              const rowDiff = opponent === 'white' ? row : 7 - row;
+              score -= rowDiff * 1.5;
+            }
+          }
+        }
+      }
+      
+      if (opponentPieces === 0) score += 10000;
+      if (playerPieces === 0) score -= 10000;
+      
+      score += playerPromotable * 5;
+      
+      const playerMoves = getAllMovesForPlayerFromState(state, player);
+      const oppMoves = getAllMovesForPlayerFromState(state, opponent);
+      const playerCaptures = playerMoves.filter(m => m.capture).length;
+      const oppCaptures = oppMoves.filter(m => m.capture).length;
+      
+      score += playerCaptures * 15;
+      score -= oppCaptures * 15;
+      score += (playerMoves.length - oppMoves.length) * 2;
+      
+      if (playerCaptures > 0 && oppCaptures === 0) score += 10;
+      if (oppCaptures > 0 && playerCaptures === 0) score -= 10;
+      
+      return score;
+    }
+
+    function isPieceProtected(state, row, col, player) {
+      const directions = player === 'white' 
+        ? [[1, -1], [1, 1]]
+        : [[-1, -1], [-1, 1]];
+      
+      for (const [dr, dc] of directions) {
+        const protRow = row + dr;
+        const protCol = col + dc;
+        if (protRow >= 0 && protRow < 8 && protCol >= 0 && protCol < 8) {
+          const piece = state[protRow][protCol];
+          if (piece && piece.player === player) {
+            return true;
+          }
+        }
+      }
+      return false;
+    }
+
+    function getAllMovesForPlayerFromState(state, player) {
+      const allMoves = [];
+      for (let row = 0; row < 8; row++) {
+        for (let col = 0; col < 8; col++) {
+          const piece = state[row][col];
+          if (piece && piece.player === player) {
+            const moves = getValidMovesFromState(state, row, col, piece);
+            for (const move of moves) {
+              allMoves.push({
+                from: { row, col },
+                to: { row: move.row, col: move.col },
+                capture: move.capture,
+                captureRow: move.captureRow,
+                captureCol: move.captureCol
+              });
+            }
+          }
+        }
+      }
+      return allMoves;
+    }
+
+    function getValidMovesFromState(state, row, col, piece) {
+      const moves = [];
+      const directions = piece.king 
+        ? [[-1, -1], [-1, 1], [1, -1], [1, 1]]
+        : piece.player === 'red' 
+          ? [[-1, -1], [-1, 1]] 
+          : [[1, -1], [1, 1]];
+
+      for (const [dr, dc] of directions) {
+        const newRow = row + dr;
+        const newCol = col + dc;
+
+        if (newRow >= 0 && newRow < 8 && newCol >= 0 && newCol < 8 && !state[newRow][newCol]) {
+          moves.push({ row: newRow, col: newCol, capture: false });
+        }
+
+        if (newRow >= 0 && newRow < 8 && newCol >= 0 && newCol < 8 && state[newRow][newCol] && 
+            state[newRow][newCol].player !== piece.player) {
+          const jumpRow = row + dr * 2;
+          const jumpCol = col + dc * 2;
+          if (jumpRow >= 0 && jumpRow < 8 && jumpCol >= 0 && jumpCol < 8 && !state[jumpRow][jumpCol]) {
+            moves.push({ row: jumpRow, col: jumpCol, capture: true, captureRow: newRow, captureCol: newCol });
+          }
+        }
+      }
+      return moves;
+    }
+
+    function makeMoveOnState(state, move) {
+      const piece = state[move.from.row][move.from.col];
+      state[move.to.row][move.to.col] = piece;
+      state[move.from.row][move.from.col] = null;
+      
+      if (move.capture) {
+        state[move.captureRow][move.captureCol] = null;
+      }
+      
+      if (piece.player === 'white' && move.to.row === 0) piece.king = true;
+      if (piece.player === 'red' && move.to.row === 7) piece.king = true;
+    }
+
+    function minimax(state, depth, alpha, beta, maximizingPlayer, aiPlayer) {
+      const player = maximizingPlayer ? aiPlayer : (aiPlayer === 'white' ? 'red' : 'white');
+      const moves = getAllMovesForPlayerFromState(state, player);
+      
+      if (depth === 0 || moves.length === 0) {
+        return evaluatePosition(state, aiPlayer);
+      }
+      
+      if (maximizingPlayer) {
+        let maxEval = -Infinity;
+        for (const move of moves) {
+          const newState = cloneGameState(state);
+          makeMoveOnState(newState, move);
+          
+          const captures = getAllMovesForPlayerFromState(newState, player).filter(m => m.capture);
+          let evalScore;
+          if (captures.length > 0 && !move.capture) {
+            evalScore = alpha;
+          } else {
+            evalScore = minimax(newState, depth - 1, alpha, beta, false, aiPlayer);
+          }
+          
+          maxEval = Math.max(maxEval, evalScore);
+          alpha = Math.max(alpha, evalScore);
+          if (beta <= alpha) break;
+        }
+        return maxEval;
+      } else {
+        let minEval = Infinity;
+        for (const move of moves) {
+          const newState = cloneGameState(state);
+          makeMoveOnState(newState, move);
+          
+          const captures = getAllMovesForPlayerFromState(newState, player).filter(m => m.capture);
+          let evalScore;
+          if (captures.length > 0 && !move.capture) {
+            evalScore = beta;
+          } else {
+            evalScore = minimax(newState, depth - 1, alpha, beta, true, aiPlayer);
+          }
+          
+          minEval = Math.min(minEval, evalScore);
+          beta = Math.min(beta, evalScore);
+          if (beta <= alpha) break;
+        }
+        return minEval;
+      }
+    }
+
+    function evaluateBestMove(moves, difficulty) {
+      if (moves.length === 0) return null;
+      
+      if (difficulty === 'easy') {
+        return moves[Math.floor(Math.random() * moves.length)];
+      }
+      
+      let depth = difficulty === 'hard' ? 5 : 3;
+      
+      const captures = moves.filter(m => m.capture);
+      if (captures.length > 0) {
+        let bestCapture = captures[0];
+        let bestScore = -Infinity;
+        
+        for (const move of captures) {
+          const newState = cloneGameState(gameState);
+          makeMoveOnState(newState, move);
+          let score = evaluatePosition(newState, 'white');
+          
+          if (move.to.row === 0) score += 100;
+          
+          if (score > bestScore) {
+            bestScore = score;
+            bestCapture = move;
+          }
+        }
+        
+        if (difficulty === 'hard') {
+          bestScore = -Infinity;
+          for (const move of captures) {
+            const newState = cloneGameState(gameState);
+            makeMoveOnState(newState, move);
+            const score = minimax(newState, depth - 1, -Infinity, Infinity, false, 'white');
+            
+            if (score > bestScore) {
+              bestScore = score;
+              bestCapture = move;
+            }
+          }
+        }
+        
+        return bestCapture;
+      }
+      
+      const promotions = moves.filter(m => m.to.row === 0);
+      if (promotions.length > 0) {
+        return promotions[Math.floor(Math.random() * promotions.length)];
+      }
+      
+      const opponentPromotionRow = 1;
+      for (const move of moves) {
+        const piece = gameState[move.from.row][move.from.col];
+        if (!piece.king && piece.player === 'white') {
+          if (move.from.row === opponentPromotionRow) {
+            return move;
+          }
+        }
+      }
+      
+      if (difficulty === 'medium') {
+        let bestMove = moves[0];
+        let bestScore = -Infinity;
+        
+        for (const move of moves) {
+          const newState = cloneGameState(gameState);
+          makeMoveOnState(newState, move);
+          let score = evaluatePosition(newState, 'white');
+          
+          const piece = gameState[move.from.row][move.from.col];
+          if (!piece.king && piece.player === 'white' && move.from.row === 1 && move.to.row !== 0) {
+            score -= 50;
+          }
+          
+          if (score > bestScore) {
+            bestScore = score;
+            bestMove = move;
+          }
+        }
+        
+        return bestMove;
+      }
+      
+      const movesWithScores = moves.map(move => {
+        const newState = cloneGameState(gameState);
+        makeMoveOnState(newState, move);
+        return { move, score: evaluatePosition(newState, 'white') };
+      });
+      
+      movesWithScores.sort((a, b) => b.score - a.score);
+      
+      let bestMove = movesWithScores[0].move;
+      let bestScore = -Infinity;
+      
+      for (let i = 0; i < Math.min(movesWithScores.length, 6); i++) {
+        const move = movesWithScores[i].move;
+        const newState = cloneGameState(gameState);
+        makeMoveOnState(newState, move);
+        
+        const score = minimax(newState, depth - 1, -Infinity, Infinity, false, 'white');
+        
+        if (score > bestScore) {
+          bestScore = score;
+          bestMove = move;
+        }
+      }
+      
+      return bestMove;
+    }
+
+    function makeAIMove() {
+      if (!isSinglePlayer || currentPlayer !== 'white') {
+        aiThinkingIndicator.style.display = 'none';
+        return;
+      }
+      
+      if (checkWin()) {
+        aiThinkingIndicator.style.display = 'none';
+        return;
+      }
+      
+      let fromRow, fromCol, mustContinueJump = false, chosenMove;
+      
+      if (selectedPiece) {
+        fromRow = selectedPiece.row;
+        fromCol = selectedPiece.col;
+        mustContinueJump = true;
+      } else {
+        const allMoves = getAllMovesForPlayer('white');
+        if (allMoves.length === 0) {
+          aiThinkingIndicator.style.display = 'none';
+          checkWin();
+          return;
+        }
+        
+        const captures = allMoves.filter(m => m.capture);
+        
+        if (aiDifficulty === 'easy') {
+          chosenMove = captures.length > 0 
+            ? captures[Math.floor(Math.random() * captures.length)]
+            : allMoves[Math.floor(Math.random() * allMoves.length)];
+        } else if (aiDifficulty === 'medium') {
+          if (captures.length > 0) {
+            chosenMove = evaluateBestMove(captures, 'medium');
+          } else {
+            chosenMove = allMoves[Math.floor(Math.random() * allMoves.length)];
+          }
+        } else {
+          if (captures.length > 0) {
+            chosenMove = evaluateBestMove(captures, 'hard');
+          } else {
+            chosenMove = evaluateBestMove(allMoves, 'hard');
+          }
+        }
+        
+        fromRow = chosenMove.from.row;
+        fromCol = chosenMove.from.col;
+      }
+      
+      const piece = gameState[fromRow][fromCol];
+      if (!piece) {
+        aiThinkingIndicator.style.display = 'none';
+        return;
+      }
+      
+      const pieceMoves = getValidMoves(fromRow, fromCol, piece);
+      const captureMoves = pieceMoves.filter(m => m.capture);
+      
+      if (captureMoves.length > 0) {
+        chosenMove = captureMoves[Math.floor(Math.random() * captureMoves.length)];
+      } else if (mustContinueJump) {
+        currentPlayer = 'red';
+        selectedPiece = null;
+        aiThinkingIndicator.style.display = 'none';
+        if (!checkWin()) {
+          updateStatus();
+          renderPieces();
+        }
+        return;
+      } else {
+        const regularMoves = pieceMoves.filter(m => !m.capture);
+        if (regularMoves.length > 0) {
+          chosenMove = regularMoves[Math.floor(Math.random() * regularMoves.length)];
+        } else {
+          aiThinkingIndicator.style.display = 'none';
+          return;
+        }
+      }
+      
+      const toRow = chosenMove.row;
+      const toCol = chosenMove.col;
+      const isCapture = chosenMove.capture;
+
+      gameState[toRow][toCol] = piece;
+      gameState[fromRow][fromCol] = null;
+
+      if (isCapture) {
+        gameState[chosenMove.captureRow][chosenMove.captureCol] = null;
+      }
+
+      const willBecomeKing = (piece.player === 'red' && toRow === 0) || 
+          (piece.player === 'white' && toRow === 7);
+
+      const doAfterAnimation = () => {
+        if (willBecomeKing) {
+          piece.king = true;
+          const kingX = (toCol - 3.5) * SQUARE_SIZE;
+          const kingZ = (toRow - 3.5) * SQUARE_SIZE;
+          createParticles(kingX, 0.5, kingZ, 0xffd700, 30);
+          triggerBoardPulse();
+          renderPieces();
+          
+          currentPlayer = 'red';
+          selectedPiece = null;
+          aiThinkingIndicator.style.display = 'none';
+
+          if (!checkWin()) {
+            updateStatus();
+            renderPieces();
+          }
+          return;
+        }
+
+        if (isCapture) {
+          const followUp = getValidMoves(toRow, toCol, piece);
+          const hasMore = followUp.some(m => m.capture);
+
+          if (hasMore) {
+            selectedPiece = { row: toRow, col: toCol };
+            renderPieces();
+            setTimeout(makeAIMove, 300);
+            return;
+          }
+        }
+
+        currentPlayer = 'red';
+        selectedPiece = null;
+        aiThinkingIndicator.style.display = 'none';
+
+        if (!checkWin()) {
+          updateStatus();
+          renderPieces();
+        }
+      };
+
+      animatePiece(fromRow, fromCol, toRow, toCol, () => {
+        if (isCapture) {
+          animateCapture(chosenMove.captureRow, chosenMove.captureCol, doAfterAnimation);
+        } else {
+          doAfterAnimation();
+        }
+      });
+    }
+
+    function getValidMoves(row, col, piece) {
+      const moves = [];
+      const directions = piece.king 
+        ? [[-1, -1], [-1, 1], [1, -1], [1, 1]]
+        : piece.player === 'red' 
+          ? [[-1, -1], [-1, 1]] 
+          : [[1, -1], [1, 1]];
+
+      for (const [dr, dc] of directions) {
+        const newRow = row + dr;
+        const newCol = col + dc;
+
+        if (isValidPos(newRow, newCol) && !gameState[newRow][newCol]) {
+          moves.push({ row: newRow, col: newCol, capture: false });
+        }
+
+        if (isValidPos(newRow, newCol) && gameState[newRow][newCol] && 
+            gameState[newRow][newCol].player !== piece.player) {
+          const jumpRow = row + dr * 2;
+          const jumpCol = col + dc * 2;
+          if (isValidPos(jumpRow, jumpCol) && !gameState[jumpRow][jumpCol]) {
+            moves.push({ row: jumpRow, col: jumpCol, capture: true, captureRow: newRow, captureCol: newCol });
+          }
+        }
+      }
+
+      return moves;
+    }
+
+    function isValidPos(row, col) {
+      return row >= 0 && row < 8 && col >= 0 && col < 8;
+    }
+
+    function makeMove(toRow, toCol) {
+      const move = validMoves.find(m => m.row === toRow && m.col === toCol);
+      if (!move || isAnimating) return;
+
+      const fromRow = selectedPiece.row;
+      const fromCol = selectedPiece.col;
+      const piece = gameState[fromRow][fromCol];
+      const isCapture = move.capture;
+
+      if (forcedJumps && !isCapture && hasAnyCaptureMoves(currentPlayer)) {
+        let pieceToRemove = null;
+        
+        for (let r = 0; r < 8; r++) {
+          for (let c = 0; c < 8; c++) {
+            const p = gameState[r][c];
+            if (p && p.player === currentPlayer) {
+              const moves = getValidMoves(r, c, p);
+              if (moves.some(m => m.capture)) {
+                pieceToRemove = { row: r, col: c };
+                break;
+              }
+            }
+          }
+          if (pieceToRemove) break;
+        }
+        
+        status.innerHTML = `<span class="${currentPlayer}">${currentPlayer.charAt(0).toUpperCase() + currentPlayer.slice(1)}</span> missed a capture! Piece lost.`;
+        
+        if (pieceToRemove) {
+          animatePieceRemoval(pieceToRemove.row, pieceToRemove.col, () => {
+            gameState[pieceToRemove.row][pieceToRemove.col] = null;
+            selectedPiece = null;
+            validMoves = [];
+            highlightsGroup.clear();
+            renderPieces();
+            
+            currentPlayer = currentPlayer === 'red' ? 'white' : 'red';
+            
+            if (!checkWin()) {
+              updateStatus();
+              if (isSinglePlayer && currentPlayer === 'white') {
+                setTimeout(makeAIMove, 500);
+              }
+            }
+          });
+        }
+        return;
+      }
+
+      gameState[toRow][toCol] = piece;
+      gameState[fromRow][fromCol] = null;
+
+      if (isCapture) {
+        gameState[move.captureRow][move.captureCol] = null;
+      }
+
+      const willBecomeKing = (piece.player === 'red' && toRow === 0) || 
+          (piece.player === 'white' && toRow === 7);
+
+      const doAfterAnimation = () => {
+        if (willBecomeKing) {
+          piece.king = true;
+          const kingX = (toCol - 3.5) * SQUARE_SIZE;
+          const kingZ = (toRow - 3.5) * SQUARE_SIZE;
+          createParticles(kingX, 0.5, kingZ, 0xffd700, 30);
+          triggerBoardPulse();
+          renderPieces();
+          
+          currentPlayer = currentPlayer === 'red' ? 'white' : 'red';
+          selectedPiece = null;
+          validMoves = [];
+          highlightsGroup.clear();
+
+          if (!checkWin()) {
+            updateStatus();
+            renderPieces();
+
+            if (isSinglePlayer && currentPlayer === 'white' && gameStarted) {
+              aiThinkingIndicator.style.display = 'block';
+              setTimeout(makeAIMove, 500);
+            }
+          }
+          return;
+        }
+
+        selectedPiece = { row: toRow, col: toCol };
+        const followUpMoves = getValidMoves(toRow, toCol, piece);
+        const hasMoreCaptures = followUpMoves.some(m => m.capture);
+
+        if (isCapture && hasMoreCaptures) {
+          validMoves = followUpMoves.filter(m => m.capture);
+          updateStatus();
+          renderPieces();
+          showValidMoves();
+        } else {
+          currentPlayer = currentPlayer === 'red' ? 'white' : 'red';
+          selectedPiece = null;
+          validMoves = [];
+          highlightsGroup.clear();
+
+          if (!checkWin()) {
+            updateStatus();
+            renderPieces();
+
+            if (isSinglePlayer && currentPlayer === 'white' && gameStarted) {
+              aiThinkingIndicator.style.display = 'block';
+              setTimeout(makeAIMove, 500);
+            }
+          }
+        }
+      };
+
+      animatePiece(fromRow, fromCol, toRow, toCol, () => {
+        if (isCapture) {
+          animateCapture(move.captureRow, move.captureCol, doAfterAnimation);
+        } else {
+          doAfterAnimation();
+        }
+      });
+    }
+
+    function hasAnyValidMoves(player) {
+      for (let row = 0; row < 8; row++) {
+        for (let col = 0; col < 8; col++) {
+          const piece = gameState[row][col];
+          if (piece && piece.player === player) {
+            const moves = getValidMoves(row, col, piece);
+            if (moves.length > 0) return true;
+          }
+        }
+      }
+      return false;
+    }
+
+    function checkWin() {
+      let redCount = 0, whiteCount = 0;
+      for (let row = 0; row < 8; row++) {
+        for (let col = 0; col < 8; col++) {
+          if (gameState[row][col]) {
+            if (gameState[row][col].player === 'red') redCount++;
+            else whiteCount++;
+          }
+        }
+      }
+
+      if (redCount === 0 || !hasAnyValidMoves('red')) {
+        status.innerHTML = '<span class="white">White</span> wins!';
+        controls.enabled = false;
+        aiThinkingIndicator.style.display = 'none';
+        createVictoryParticles(0xffffff);
+        createVictoryParticles(0xffd700);
+        triggerBoardPulse();
+        return true;
+      }
+      if (whiteCount === 0 || !hasAnyValidMoves('white')) {
+        status.innerHTML = '<span class="red">Red</span> wins!';
+        controls.enabled = false;
+        aiThinkingIndicator.style.display = 'none';
+        createVictoryParticles(0xe74c3c);
+        createVictoryParticles(0xffd700);
+        triggerBoardPulse();
+        return true;
+      }
+      return false;
+    }
+
+    function updateStatus() {
+      status.innerHTML = `Turn: <span class="${currentPlayer}">${currentPlayer.charAt(0).toUpperCase() + currentPlayer.slice(1)}</span>`;
+      controls.enabled = true;
+      
+      if (randomizeColors) {
+        randomizeBoardColors();
+      }
+    }
+    
+    function randomizeBoardColors() {
+      colors.light = Math.floor(Math.random() * 16777215);
+      colors.dark = Math.floor(Math.random() * 16777215);
+      colors.frame = Math.floor(Math.random() * 16777215);
+      colors.red = Math.floor(Math.random() * 16777215);
+      colors.redTop = Math.floor(Math.random() * 16777215);
+      colors.white = Math.floor(Math.random() * 16777215);
+      colors.whiteTop = Math.floor(Math.random() * 16777215);
+      applyColors();
+    }
+
+    function onMouseClick(event) {
+      if (!gameStarted || isAnimating) return;
+
+      if (isSinglePlayer && currentPlayer === 'white') return;
+
+      const rect = renderer.domElement.getBoundingClientRect();
+      mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+      mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+      raycaster.setFromCamera(mouse, camera);
+
+      const pieceIntersects = raycaster.intersectObjects(piecesGroup.children, true);
+      const squareIntersects = raycaster.intersectObjects(boardGroup.children, true);
+      const highlightIntersects = raycaster.intersectObjects(highlightsGroup.children, true);
+
+      if (highlightIntersects.length > 0) {
+        const highlight = highlightIntersects[0].object;
+        makeMove(highlight.userData.row, highlight.userData.col);
+        return;
+      }
+
+      if (pieceIntersects.length > 0) {
+        let clickedPiece = pieceIntersects[0].object;
+        while (clickedPiece.parent && clickedPiece.parent !== piecesGroup) {
+          clickedPiece = clickedPiece.parent;
+        }
+        if (clickedPiece.userData && clickedPiece.userData.type === 'piece') {
+          selectPiece(clickedPiece.userData.row, clickedPiece.userData.col);
+          return;
+        }
+      }
+
+      if (squareIntersects.length > 0) {
+        const clickedSquare = squareIntersects[0].object;
+        if (clickedSquare.userData && clickedSquare.userData.type === 'square') {
+          if (validMoves.some(m => m.row === clickedSquare.userData.row && m.col === clickedSquare.userData.col)) {
+            makeMove(clickedSquare.userData.row, clickedSquare.userData.col);
+          }
+        }
+      }
+    }
+
+    function animatePiece(fromRow, fromCol, toRow, toCol, onComplete) {
+      isAnimating = true;
+      const pieceMesh = pieceMeshes[`${fromRow}-${fromCol}`];
+      if (!pieceMesh) {
+        isAnimating = false;
+        if (onComplete) onComplete();
+        return;
+      }
+
+      const startX = pieceMesh.position.x;
+      const startZ = pieceMesh.position.z;
+      const targetX = (toCol - 3.5) * SQUARE_SIZE;
+      const targetZ = (toRow - 3.5) * SQUARE_SIZE;
+      
+      const jumpHeight = 0.5;
+      const duration = 300;
+      const startTime = performance.now();
+
+      function step(currentTime) {
+        const elapsed = currentTime - startTime;
+        const t = Math.min(elapsed / duration, 1);
+        
+        const easeT = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+        
+        pieceMesh.position.x = startX + (targetX - startX) * easeT;
+        pieceMesh.position.z = startZ + (targetZ - startZ) * easeT;
+        
+        const jumpT = Math.sin(t * Math.PI);
+        pieceMesh.position.y = PIECE_HEIGHT / 2 + jumpHeight * jumpT;
+
+        if (t < 1) {
+          requestAnimationFrame(step);
+        } else {
+          pieceMesh.position.x = targetX;
+          pieceMesh.position.z = targetZ;
+          pieceMesh.position.y = PIECE_HEIGHT / 2;
+          
+          isAnimating = false;
+          if (onComplete) onComplete();
+        }
+      }
+
+      requestAnimationFrame(step);
+    }
+
+    function animateCapture(captureRow, captureCol, onComplete) {
+      const capturedMesh = pieceMeshes[`${captureRow}-${captureCol}`];
+      if (!capturedMesh) {
+        if (onComplete) onComplete();
+        return;
+      }
+
+      const captureX = (captureCol - 3.5) * SQUARE_SIZE;
+      const captureZ = (captureRow - 3.5) * SQUARE_SIZE;
+      const captureY = PIECE_HEIGHT / 2;
+      
+      triggerScreenShake(0.15);
+      createParticles(captureX, captureY, captureZ, 0xffd700, 20);
+
+      const duration = 200;
+      const startTime = performance.now();
+      const startScale = 1;
+
+      function step(currentTime) {
+        const elapsed = currentTime - startTime;
+        const t = Math.min(elapsed / duration, 1);
+        
+        const scale = startScale * (1 - t);
+        capturedMesh.scale.set(scale, scale, scale);
+
+        if (t < 1) {
+          requestAnimationFrame(step);
+        } else {
+          if (onComplete) onComplete();
+        }
+      }
+
+      requestAnimationFrame(step);
+    }
+
+    function animatePieceRemoval(row, col, onComplete) {
+      const removedMesh = pieceMeshes[`${row}-${col}`];
+      
+      function findMissedCapture(player) {
+        for (let r = 0; r < 8; r++) {
+          for (let c = 0; c < 8; c++) {
+            const piece = gameState[r][c];
+            if (piece && piece.player === player) {
+              const moves = getValidMoves(r, c, piece);
+              const capture = moves.find(m => m.capture);
+              if (capture) {
+                return { fromRow: r, fromCol: c, toRow: capture.row, toCol: capture.col, captureRow: capture.captureRow, captureCol: capture.captureCol };
+              }
+            }
+          }
+        }
+        return null;
+      }
+
+      const missed = findMissedCapture(currentPlayer);
+      
+      if (missed) {
+        const fromX = (missed.fromCol - 3.5) * SQUARE_SIZE;
+        const fromZ = (missed.fromRow - 3.5) * SQUARE_SIZE;
+        const toX = (missed.toCol - 3.5) * SQUARE_SIZE;
+        const toZ = (missed.toRow - 3.5) * SQUARE_SIZE;
+        const captureX = (missed.captureCol - 3.5) * SQUARE_SIZE;
+        const captureZ = (missed.captureRow - 3.5) * SQUARE_SIZE;
+        
+        const lineMaterial = new THREE.LineBasicMaterial({ color: 0xff0000, linewidth: 3 });
+        const lineGeometry = new THREE.BufferGeometry().setFromPoints([
+          new THREE.Vector3(fromX, 0.3, fromZ),
+          new THREE.Vector3(toX, 0.3, toZ)
+        ]);
+        const line = new THREE.Line(lineGeometry, lineMaterial);
+        piecesGroup.add(line);
+        
+        let animPiece = null;
+        if (gameState[missed.fromRow][missed.fromCol]) {
+          animPiece = createPiece(gameState[missed.fromRow][missed.fromCol].player, gameState[missed.fromRow][missed.fromCol].king);
+          animPiece.position.set(fromX, PIECE_HEIGHT / 2, fromZ);
+          piecesGroup.add(animPiece);
+        }
+        
+        const duration = 800;
+        const startTime = performance.now();
+        
+        function animateJump(currentTime) {
+          const elapsed = currentTime - startTime;
+          const t = Math.min(elapsed / duration, 1);
+          
+          const eased = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+          
+          if (animPiece) {
+            animPiece.position.x = fromX + (toX - fromX) * eased;
+            animPiece.position.z = fromZ + (toZ - fromZ) * eased;
+          }
+          
+          line.geometry.dispose();
+          const newLineGeometry = new THREE.BufferGeometry().setFromPoints([
+            new THREE.Vector3(fromX, 0.3, fromZ),
+            new THREE.Vector3(fromX + (toX - fromX) * eased, 0.3, fromZ + (toZ - fromZ) * eased)
+          ]);
+          line.geometry = newLineGeometry;
+          
+          if (t < 1) {
+            requestAnimationFrame(animateJump);
+          } else {
+            setTimeout(() => {
+              piecesGroup.remove(line);
+              lineGeometry.dispose();
+              lineMaterial.dispose();
+              
+              if (animPiece) {
+                piecesGroup.remove(animPiece);
+                animPiece.traverse(child => {
+                  if (child.geometry) child.geometry.dispose();
+                  if (child.material) child.material.dispose();
+                });
+              }
+              
+              if (removedMesh) {
+                createParticles((col - 3.5) * SQUARE_SIZE, PIECE_HEIGHT / 2, (row - 3.5) * SQUARE_SIZE, 0xff0000, 20);
+                triggerScreenShake(0.15);
+                
+                const removeDuration = 400;
+                const removeStartTime = performance.now();
+                
+                function step(currentTime2) {
+                  const elapsed2 = currentTime2 - removeStartTime;
+                  const t2 = Math.min(elapsed2 / removeDuration, 1);
+                  const scale = 1 - t2;
+                  removedMesh.scale.set(scale, scale, scale);
+                  
+                  if (t2 < 1) {
+                    requestAnimationFrame(step);
+                  } else {
+                    if (onComplete) onComplete();
+                  }
+                }
+                requestAnimationFrame(step);
+              } else {
+                if (onComplete) onComplete();
+              }
+            }, 300);
+          }
+        }
+        
+        requestAnimationFrame(animateJump);
+      } else {
+        if (removedMesh) {
+          createParticles((col - 3.5) * SQUARE_SIZE, PIECE_HEIGHT / 2, (row - 3.5) * SQUARE_SIZE, 0xff0000, 15);
+          triggerScreenShake(0.1);
+          
+          const duration = 400;
+          const startTime = performance.now();
+          
+          function step(currentTime) {
+            const elapsed = currentTime - startTime;
+            const t = Math.min(elapsed / duration, 1);
+            const scale = 1 - t;
+            removedMesh.scale.set(scale, scale, scale);
+            
+            if (t < 1) {
+              requestAnimationFrame(step);
+            } else {
+              if (onComplete) onComplete();
+            }
+          }
+          requestAnimationFrame(step);
+        } else {
+          if (onComplete) onComplete();
+        }
+      }
+    }
+
+    function onWindowResize() {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    }
+
+    function createParticles(x, y, z, color, count = 15) {
+      for (let i = 0; i < count; i++) {
+        const geometry = new THREE.SphereGeometry(0.05, 8, 8);
+        const material = new THREE.MeshBasicMaterial({ 
+          color: color,
+          transparent: true,
+          opacity: 1
+        });
+        const particle = new THREE.Mesh(geometry, material);
+        particle.position.set(x, y, z);
+        
+        const angle = Math.random() * Math.PI * 2;
+        const speed = 0.05 + Math.random() * 0.1;
+        const upSpeed = 0.05 + Math.random() * 0.1;
+        
+        particle.userData = {
+          vx: Math.cos(angle) * speed,
+          vy: upSpeed,
+          vz: Math.sin(angle) * speed,
+          life: 1,
+          decay: 0.02 + Math.random() * 0.02
+        };
+        
+        scene.add(particle);
+        particles.push(particle);
+      }
+    }
+
+    function createVictoryParticles(color) {
+      for (let i = 0; i < 50; i++) {
+        const geometry = new THREE.SphereGeometry(0.08, 8, 8);
+        const material = new THREE.MeshBasicMaterial({ 
+          color: color,
+          transparent: true,
+          opacity: 1
+        });
+        const particle = new THREE.Mesh(geometry, material);
+        
+        const x = (Math.random() - 0.5) * 10;
+        const z = (Math.random() - 0.5) * 10;
+        particle.position.set(x, 8 + Math.random() * 5, z);
+        
+        particle.userData = {
+          vy: -0.05 - Math.random() * 0.1,
+          life: 1,
+          decay: 0.005 + Math.random() * 0.01
+        };
+        
+        scene.add(particle);
+        victoryParticles.push(particle);
+      }
+    }
+
+    function triggerScreenShake(intensity = 0.1) {
+      screenShake = {
+        x: (Math.random() - 0.5) * intensity,
+        y: (Math.random() - 0.5) * intensity,
+        z: (Math.random() - 0.5) * intensity
+      };
+    }
+
+    function triggerBoardPulse() {
+      boardPulse = 1;
+    }
+
+    function updateParticles() {
+      for (let i = particles.length - 1; i >= 0; i--) {
+        const p = particles[i];
+        p.position.x += p.userData.vx;
+        p.position.y += p.userData.vy;
+        p.position.z += p.userData.vz;
+        p.userData.vy -= 0.003;
+        p.userData.life -= p.userData.decay;
+        p.material.opacity = p.userData.life;
+        
+        if (p.userData.life <= 0) {
+          scene.remove(p);
+          particles.splice(i, 1);
+        }
+      }
+
+      for (let i = victoryParticles.length - 1; i >= 0; i--) {
+        const p = victoryParticles[i];
+        p.position.y += p.userData.vy;
+        p.userData.life -= p.userData.decay;
+        p.material.opacity = p.userData.life;
+        p.rotation.x += 0.05;
+        p.rotation.y += 0.05;
+        
+        if (p.userData.life <= 0 || p.position.y < -2) {
+          scene.remove(p);
+          victoryParticles.splice(i, 1);
+        }
+      }
+    }
+
+    function animate() {
+      requestAnimationFrame(animate);
+      
+      updateParticles();
+      updateFlingPieces();
+      
+      if (screenShake.x !== 0 || screenShake.y !== 0 || screenShake.z !== 0) {
+        camera.position.x += screenShake.x;
+        camera.position.y += screenShake.y;
+        camera.position.z += screenShake.z;
+        screenShake.x *= 0.9;
+        screenShake.y *= 0.9;
+        screenShake.z *= 0.9;
+        if (Math.abs(screenShake.x) < 0.001) screenShake = { x: 0, y: 0, z: 0 };
+      }
+      
+      if (boardPulse > 0) {
+        boardGroup.scale.setScalar(1 + boardPulse * 0.02);
+        boardPulse *= 0.95;
+        if (boardPulse < 0.01) {
+          boardPulse = 0;
+          boardGroup.scale.setScalar(1);
+        }
+      }
+      
+      controls.update();
+      renderer.render(scene, camera);
+    }
+
+    init();
+  </script>
+</body>
+</html>
